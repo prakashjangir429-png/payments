@@ -50,22 +50,6 @@ async function hitApi200TimesConcurrently(url, basePayload = {}, config = {}) {
 
 connectDB().then(() => {
   logger.info('Database connected successfully');
-  // hitApi200TimesConcurrently(
-  //   'http://localhost:3000/api/v1/payment/create',
-  //   {
-  //     "amount": 30,
-  //     "name": "Prakash Doe",
-  //     "email": "prakash@example.com",
-  //     "mobileNumber": "8302845977"
-  //   },
-  //   {
-  //     headers: {
-  //       'authorization': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnRJZCI6IlVJRC1NQjdVUDBVRi0yVzRKT1QiLCJ1c2VyTmFtZSI6InRlc3RpbmcifQ.QiBIYAnnpj3FuvPQB2MaE-orLoffcfFP2LOVipqQtq4',
-  //     }
-  //   }
-  // );
-
-
   const URL = "http://localhost:3030/api/v1/payments/initiate";
 
   async function hitApi(times = 100) {
@@ -100,9 +84,7 @@ connectDB().then(() => {
     await Promise.all(requests);
     console.log("🔥 Finished 100 API hits");
   }
-
-  hitApi(100);
-
+  // hitApi(100);
 })
 
 const port = process.env.PORT || 3000;
