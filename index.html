@@ -1,0 +1,20 @@
+<html>
+  <body>
+    <form name="payment_post" id="payment_post" action="https://test.payu.in/ad2eb91e0a71c54374968986acba253f7ab62042a3e0ff7e1bc2a205e37a3cc1/intentSeamlessHandler.php" method="post">
+      <input type="hidden" name="token" value="4575E992-6A71-E77B-2EE8-87871626F12F">
+      <input type="hidden" name="amount" value="1.00">
+      <input type="hidden" name="mihpayid" value="ad2eb91e0a71c54374968986acba253f5305e393d0a82ee4e68d5795c7d0b1a1">
+      <input type="hidden" name="disableIntentSeamlessFailure" value="0">
+      <input type="hidden" name="payeeVpa" value="kk.payutest@hdfcbank">
+      <input type="hidden" name="payeeName" value="SPIRALSTYLEFASHIONPRIVATELIMITED">
+      <input type="hidden" name="additionalCharges" value="">
+      <input type="hidden" name="transactionFee" value="1.00">
+    </form>
+
+    <script type='text/javascript'>
+      window.onload = function() {
+        document.forms['payment_post'].submit();
+      }
+    </script>
+  </body>
+</html>
