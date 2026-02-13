@@ -210,3 +210,59 @@ export const generatePayOut = async (req, res, next) => {
         release();
     }
 };
+
+export const checkPaymentStatus = async (req, res, next) => {
+    try {
+        const { txnId } = req.params;
+
+        if (!txnId) {
+            return res.status(400).json({
+                status: 'Failed',
+                status_code: 400,
+                message: "Transaction ID are required"
+            });
+        }
+
+        const result = await PayinGenerationRecord.aggregate([
+            {
+                $match: {
+                    trxId: txnId
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    status: 1,
+                    amount: 1,
+                    gatewayCharge: 1,
+                    netAmount: { $subtract: ["$amount", "$gatewayCharge"] },
+                    trxId: 1,
+                    accountNumber: 1,
+                    accountHolderName:1,
+                    ifscCode:1,
+                    utr: 1
+                }
+            },
+            {
+                $limit: 1
+            }
+        ]);
+        if (result.length === 0) {
+            return res.status(404).json({
+                status: 'Failed',
+                status_code: 404,
+                message: "Transaction not found"
+            });
+        }
+        const response = {
+            status: 'Success',
+            status_code: 200,
+            message: "Transaction Detail fetch successfully",
+            data: result[0]
+        };
+        return res.status(200).json(response);
+
+    } catch (error) {
+        return next(error)
+    }
+};

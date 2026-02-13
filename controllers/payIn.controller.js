@@ -192,8 +192,8 @@ export const generatePayment = async (req, res, next) => {
                         "amount": amount,
                         "email": email,
                         "name": name,
-                        "mobile": mobileNumber,
-                        "orderId": txnId
+                        "mobile": Number(mobileNumber),
+                        "orderId": Number(txnId)
                     }
 
                     const bank = await axios.post(user?.payInApi?.baseUrl, payload, {
@@ -445,7 +445,6 @@ export const payinfintechCallback = async (req, res, next) => {
     try {
         const { orderId: txnId, utr, status, paymentMethod: message } = req.body;
 
-
         const paymentRecord = await PayinGenerationRecord.findOneAndUpdate(
             { txnId, status: 'Pending' },
             {
@@ -515,7 +514,8 @@ export const payinfintechCallback = async (req, res, next) => {
                         ]);
 
                         if (userMeta?.payInCallbackUrl) {
-                            axios.post(userMeta.payInCallbackUrl, {
+                            try {
+                                 axios.post(userMeta.payInCallbackUrl, {
                                 event: 'payin_success',
                                 txnId: paymentRecord.txnId,
                                 status: 'Success',
@@ -528,11 +528,15 @@ export const payinfintechCallback = async (req, res, next) => {
                                 txnStartDate: paymentRecord.createdAt,
                                 message: 'Payment Received successfully',
                             })
+                            } catch (error) {
+                                null
+                            }  
                         };
 
                     } else if (status != 'success') {
                         if (userMeta?.payInCallbackUrl) {
-                            axios.post(userMeta.payInCallbackUrl, {
+                            try {
+                                 axios.post(userMeta.payInCallbackUrl, {
                                 event: 'payin_failed',
                                 txnId: paymentRecord.txnId,
                                 status: 'Failed',
@@ -543,6 +547,9 @@ export const payinfintechCallback = async (req, res, next) => {
                                 txnStartDate: paymentRecord.createdAt,
                                 message: 'Payment failed',
                             })
+                            } catch (error) {
+                                null
+                            }
                         };
                     }
                 })

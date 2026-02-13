@@ -1,7 +1,7 @@
 import express from "express";
 import { celebrate } from "celebrate";
 import Joi from 'joi';
-import { generatePayOut } from "../controllers/payout.controller.js";
+import { checkPaymentStatus, generatePayOut } from "../controllers/payout.controller.js";
 import { verifyToken } from "../middleware/apiToken.js";
 
 // email: Joi.string().email(),
@@ -32,21 +32,18 @@ router.post(
     generatePayOut
 );
 
-// router.get(
-//     "/status/:txnId",
-//     celebrate({
-//         params: Joi.object({
-//             txnId: Joi.string().required()
-//         }),
-//         headers: Joi.object({
-//             'authorization': Joi.string().required()
-//         }).unknown(true)
-//     }), verifyToken, checkPaymentStatus
-// );
 
-// router.post(
-//     "/callback", payinCallback
-// );
+router.get(
+    "/status/:txnId",
+    celebrate({
+        params: Joi.object({
+            txnId: Joi.string().required()
+        }),
+        headers: Joi.object({
+            'authorization': Joi.string().required()
+        }).unknown(true)
+    }), verifyToken, checkPaymentStatus
+);
 
 // router.post(
 //     "/payu", payuCallback
