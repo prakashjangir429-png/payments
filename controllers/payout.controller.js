@@ -342,11 +342,13 @@ export const updatePayoutStatus = async (req, res) => {
             return res.status(400).json({ message: "Payout record not found" });
         }
 
-        // const userMeta = await userMetaModel.findOne({ userId: payOutGen.user_id }).session(session);
-        const [user, userMeta] = await Promise.all([
-            userModel.findById(payOutGen.user_id).session(session),
-            userMetaModel.findOne({ userId: payOutGen.user_id }).session(session)
-        ]);
+        const userMeta = await userMetaModel.findOne({ userId: payOutGen.user_id }).session(session);
+
+        // const [user, userMeta] = await Promise.all([
+        //     userModel.findById(payOutGen.user_id).session(session),
+        //     userMetaModel.findOne({ userId: payOutGen.user_id }).session(session)
+        // ]);
+        
         const netAmount = payOutGen.amount + (payOutGen.gatewayCharge || 0);
 
         if (statusCheck.status.toLowerCase() != "success" || statusCheck.status_code != 101) {
@@ -363,18 +365,18 @@ export const updatePayoutStatus = async (req, res) => {
                 return res.status(500).json({ message: "Failed", data: "Wallet update failed" });
             }
 
-            const walletModelDataStore = {
-                userId: payOutGen.user_id,
-                type: "credit",
-                amount: payOutGen.amount,
-                beforeAmount: updatedUserWallet.upiWalletBalance - netAmount,
-                charges: payOutGen.gatewayCharge || 0,
-                afterAmount: updatedUserWallet.upiWalletBalance,
-                description: `Successfully credited amount: ${Number(netAmount)} with transaction Id: ${trxId}`,
-                transactionStatus: "failed",
-            };
+            // const walletModelDataStore = {
+            //     userId: payOutGen.user_id,
+            //     type: "credit",
+            //     amount: payOutGen.amount,
+            //     beforeAmount: updatedUserWallet.upiWalletBalance - netAmount,
+            //     charges: payOutGen.gatewayCharge || 0,
+            //     afterAmount: updatedUserWallet.upiWalletBalance,
+            //     description: `Successfully credited amount: ${Number(netAmount)} with transaction Id: ${trxId}`,
+            //     transactionStatus: "failed",
+            // };
 
-            await MainWalletTransaction.create([walletModelDataStore], { session });
+            // await MainWalletTransaction.create([walletModelDataStore], { session });
 
             if (userMeta?.payOutCallbackUrl) {
                 try {
@@ -414,21 +416,23 @@ export const updatePayoutStatus = async (req, res) => {
                 isSuccess: "Success"
             };
 
-            const walletModelDataStore = {
-                userId: payOutGen.user_id,
-                type: "debit",
-                amount: payOutGen.amount,
-                beforeAmount: user.upiWalletBalance + Number(netAmount),
-                charges: payOutGen.gatewayCharge || 0,
-                afterAmount: user.upiWalletBalance,
-                description: `Successfully debited amount: ${Number(netAmount)} with transaction Id: ${trxId}`,
-                transactionStatus: "success",
-            };
+            // const walletModelDataStore = {
+            //     userId: payOutGen.user_id,
+            //     type: "debit",
+            //     amount: payOutGen.amount,
+            //     beforeAmount: user.upiWalletBalance + Number(netAmount),
+            //     charges: payOutGen.gatewayCharge || 0,
+            //     afterAmount: user.upiWalletBalance,
+            //     description: `Successfully debited amount: ${Number(netAmount)} with transaction Id: ${trxId}`,
+            //     transactionStatus: "success",
+            // };
 
-            await Promise.all([
-                payOutModel.create([payoutDataStore], { session }),
-                MainWalletTransaction.create([walletModelDataStore], { session })
-            ]);
+            await payOutModel.create([payoutDataStore], { session });
+
+            // await Promise.all([
+            //     payOutModel.create([payoutDataStore], { session }),
+            //     // MainWalletTransaction.create([walletModelDataStore], { session })
+            // ]);
             if (userMeta?.payOutCallbackUrl) {
                 try {
                     axios.post(userMeta.payOutCallbackUrl, {
