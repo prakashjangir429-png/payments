@@ -13,9 +13,9 @@ import { celebrate, Joi } from 'celebrate';
 
 const router = express.Router();
 
-router.post('/verify',verifyUserForPasswordReset);
+// router.post('/verify',verifyUserForPasswordReset);
 
-router.post('/reset-password', resetPasswordWithToken);
+// router.post('/reset-password', resetPasswordWithToken);
 
 // User Routes
 router.use(protect);
@@ -41,7 +41,6 @@ router.post('/upsert', celebrate({
 router.get('/me', getUserMeta);
 router.put('/whitelist', updateWhitelistedIPs);
 
-// Admin Routes
 router.get('/:userId',restrictTo('Admin'), getMetaByUserId);
 router.delete('/:userId',restrictTo('Admin'), deleteUserMeta);
 

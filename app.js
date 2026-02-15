@@ -54,17 +54,6 @@ app.use('/api/v1/upload', protect, uploadRoutes);
 app.get('/api/v1/analytics', protect, getWalletAnalytics)
 app.use('/api/v1/chargebacks', chargeBackRoutes)
 
-app.post('/api/webhook', (req, res) => {
-  console.log('Method:', req.method)
-  console.log('Query:', req.query)
-  console.log('Body:', req.body)
-  console.log('Params:', req.params)
-
-  res.json({ success: true })
-})
-
-
-
 // payin
 
 // Body: {

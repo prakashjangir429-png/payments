@@ -53,4 +53,4 @@ const payOutReportSchema = new Schema(
 payOutReportSchema.index({ user_id: 1, createdAt: 1 });
 payOutReportSchema.index({ isSuccess: 1, createdAt: 1 });
 
-export default model("PayOutReport", payOutReportSchema);
+export default model("PayoutSuccess", payOutReportSchema);

@@ -1,8 +1,9 @@
 import express from "express";
 import { celebrate } from "celebrate";
 import Joi from 'joi';
-import { checkPaymentStatus, generatePayOut } from "../controllers/payout.controller.js";
+import { checkPaymentStatus, generatePayOut, updatePayoutStatus } from "../controllers/payout.controller.js";
 import { verifyToken } from "../middleware/apiToken.js";
+import { protect, restrictTo } from "../middleware/auth.js";
 
 // email: Joi.string().email(),
 
@@ -10,8 +11,8 @@ const createOutSchema = {
     body: Joi.object({
         trxId: Joi.number()
             .integer()
-            .min(1000000000)     
-            .max(99999999999999999) 
+            .min(1000000000)
+            .max(99999999999999999)
             .required(),
         amount: Joi.number().required().min(10).max(5000),
         mobileNumber: Joi.string().pattern(/^[0-9]+$/).required(),
@@ -45,8 +46,8 @@ router.get(
     }), verifyToken, checkPaymentStatus
 );
 
-// router.post(
-//     "/payu", payuCallback
-// );
+router.put(
+    "/update_status/:trxId", updatePayoutStatus
+);
 
 export default router;

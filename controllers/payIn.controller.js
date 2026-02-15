@@ -445,6 +445,14 @@ export const payinfintechCallback = async (req, res, next) => {
     try {
         const { orderId: txnId, utr, status, paymentMethod: message } = req.body;
 
+        // Body: {
+        //   amount: '100.00',
+        //   utr: '960548817074',
+        //   orderId: '123451234512339',
+        //   status: 'success',
+        //   paymentMethod: 'debit_card'
+        // }
+
         const paymentRecord = await PayinGenerationRecord.findOneAndUpdate(
             { txnId, status: 'Pending' },
             {
@@ -515,38 +523,38 @@ export const payinfintechCallback = async (req, res, next) => {
 
                         if (userMeta?.payInCallbackUrl) {
                             try {
-                                 axios.post(userMeta.payInCallbackUrl, {
-                                event: 'payin_success',
-                                txnId: paymentRecord.txnId,
-                                status: 'Success',
-                                status_code: 200,
-                                amount: paymentRecord.amount,
-                                gatwayCharge: paymentRecord.chargeAmount,
-                                utr: paymentRecord.utr,
-                                vpaId: 'abc@upi',
-                                txnCompleteDate: new Date(),
-                                txnStartDate: paymentRecord.createdAt,
-                                message: 'Payment Received successfully',
-                            })
+                                axios.post(userMeta.payInCallbackUrl, {
+                                    event: 'payin_success',
+                                    txnId: paymentRecord.txnId,
+                                    status: 'Success',
+                                    status_code: 200,
+                                    amount: paymentRecord.amount,
+                                    gatwayCharge: paymentRecord.chargeAmount,
+                                    utr: paymentRecord.utr,
+                                    vpaId: 'abc@upi',
+                                    txnCompleteDate: new Date(),
+                                    txnStartDate: paymentRecord.createdAt,
+                                    message: 'Payment Received successfully',
+                                })
                             } catch (error) {
                                 null
-                            }  
+                            }
                         };
 
                     } else if (status != 'success') {
                         if (userMeta?.payInCallbackUrl) {
                             try {
-                                 axios.post(userMeta.payInCallbackUrl, {
-                                event: 'payin_failed',
-                                txnId: paymentRecord.txnId,
-                                status: 'Failed',
-                                status_code: 200,
-                                amount: paymentRecord.amount,
-                                utr: null,
-                                vpaId: null,
-                                txnStartDate: paymentRecord.createdAt,
-                                message: 'Payment failed',
-                            })
+                                axios.post(userMeta.payInCallbackUrl, {
+                                    event: 'payin_failed',
+                                    txnId: paymentRecord.txnId,
+                                    status: 'Failed',
+                                    status_code: 200,
+                                    amount: paymentRecord.amount,
+                                    utr: null,
+                                    vpaId: null,
+                                    txnStartDate: paymentRecord.createdAt,
+                                    message: 'Payment failed',
+                                })
                             } catch (error) {
                                 null
                             }

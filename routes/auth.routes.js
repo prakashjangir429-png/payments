@@ -29,7 +29,7 @@ router.get('/profile', getUserProfile);
 router.put('/profile', updateUserProfile);
 router.put('/bank_details', updateBankDetails)
 router.put('/change-password', changePassword);
-router.put('/change-trx-password', changeTrxPassword);
+// router.put('/change-trx-password', changeTrxPassword);
 
 router.use(restrictTo('Admin'))
 
