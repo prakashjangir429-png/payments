@@ -193,7 +193,7 @@ export const generatePayment = async (req, res, next) => {
                         "email": email,
                         "name": name,
                         "mobile": Number(mobileNumber),
-                        "orderId": Number(txnId)
+                        "orderId": txnId
                     }
 
                     const bank = await axios.post(user?.payInApi?.baseUrl, payload, {

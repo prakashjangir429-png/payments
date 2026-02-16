@@ -12,7 +12,7 @@ const createOutSchema = {
         trxId: Joi.number()
             .integer()
             .min(1000000000)
-            .max(99999999999999999)
+            .max(999999999999999)
             .required(),
         amount: Joi.number().required().min(10).max(5000),
         mobileNumber: Joi.string().pattern(/^[0-9]+$/).required(),
