@@ -189,7 +189,7 @@ export const generatePayment = async (req, res, next) => {
             case "payinfintech":
                 try {
                     const payload = {
-                        "amount": amount,
+                        "amount": Number(amount),
                         "email": email,
                         "name": name,
                         "mobile": Number(mobileNumber),
