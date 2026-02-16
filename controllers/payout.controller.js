@@ -309,7 +309,7 @@ export const updatePayoutStatus = async (req, res) => {
             if (!statusResponse?.data || !statusResponse.data.status) {
                 await session.abortTransaction();
                 session.endSession();
-                return res.status(400).json({ message: "Failed", data: "Invalid response from payout API" });
+                return res.status(400).json({ message: "Failed", data: "Invalid response from payout API" , response: statusResponse?.data});
             } else {
                 statusCheck = {
                     status: statusResponse.data.data.status,

