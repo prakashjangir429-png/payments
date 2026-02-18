@@ -224,7 +224,7 @@ export const generatePayment = async (req, res, next) => {
                             paymentRecord.status = "Failed";
                             paymentRecord.failureReason = bank?.data?.message || "Payment gateway error";
                             await paymentRecord.save();
-                            return res.status(400).json({ status: "Failed", status_code: 400, message: 'Banking Server Down' })
+                            return res.status(400).json({ status: "Failed", status_code: 400, message: bank?.data?.message || 'Banking Server Down' })
                         }
                     }
                 } catch (error) {
