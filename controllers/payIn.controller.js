@@ -200,6 +200,12 @@ export const generatePayment = async (req, res, next) => {
                         headers: { "Authorization": `Bearer ${user?.payInApi?.apiKey}` }
                     });
 
+                    console.log("URL:", user?.payInApi?.baseUrl);
+                    console.log("Payload:", payload);
+                    console.log("Response:", bank.data);
+                    console.log("Time:", new Date().toISOString());
+
+
                     if (bank.status != 200) {
                         paymentRecord.status = "Failed";
                         paymentRecord.failureReason = bank?.data?.message || "Payment gateway error";
