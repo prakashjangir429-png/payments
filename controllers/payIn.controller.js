@@ -200,18 +200,6 @@ export const generatePayment = async (req, res, next) => {
                         headers: { "Authorization": `Bearer ${user?.payInApi?.apiKey}` }
                     });
 
-                    console.log("URL:", user?.payInApi?.baseUrl);
-                    console.log("Payload:", payload);
-                    console.log("Response:", bank.data);
-                    console.log("Time:", new Date().toISOString());
-                    const curlCommand = `
-curl -X POST "${user?.payInApi?.baseUrl}" \
--H "Authorization: Bearer jwttoken" \
--H "Content-Type: application/json" \
--d '${JSON.stringify(payload)}'
-`;
-                    console.log(curlCommand);
-
                     if (bank.status != 200) {
                         paymentRecord.status = "Failed";
                         paymentRecord.failureReason = bank?.data?.message || "Payment gateway error";
@@ -236,7 +224,7 @@ curl -X POST "${user?.payInApi?.baseUrl}" \
                             paymentRecord.status = "Failed";
                             paymentRecord.failureReason = bank?.data?.message || "Payment gateway error";
                             await paymentRecord.save();
-                            return res.status(400).json({ status: "Failed", status_code: 400, message: bank?.data?.message || 'Banking Server Down' })
+                            return res.status(400).json({ status: "Failed", status_code: 400, message: 'Banking Server Down' })
                         }
                     }
                 } catch (error) {
