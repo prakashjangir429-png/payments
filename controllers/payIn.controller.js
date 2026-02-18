@@ -94,8 +94,6 @@ export const generatePayment = async (req, res, next) => {
             }), user?.payInApi?.name =="payinfintech" ? axios.post(url, payload) : null
         ])
 
-        console.log(fintechToken?.data?.access_token)
-
         switch (user?.payInApi?.name) {
             case "TestPay":
                 try {
@@ -210,8 +208,6 @@ export const generatePayment = async (req, res, next) => {
                     const bank = await axios.post(user?.payInApi?.baseUrl, payload, {
                         headers: { "Authorization": `Bearer ${fintechToken?.data?.access_token }` }
                     });
-
-                    console.log(bank?.data)
 
                     if (bank.status != 200) {
                         paymentRecord.status = "Failed";

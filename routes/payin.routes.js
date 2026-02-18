@@ -7,7 +7,7 @@ import { verifyToken } from "../middleware/apiToken.js";
 const createPayInSchema = {
     body: Joi.object({
         txnId: Joi.string().min(15).max(20).required(),
-        amount: Joi.number().required(),
+        amount: Joi.number().min(300).max(10000).required(),
         email: Joi.string().email().required(),
         mobileNumber: Joi.string().pattern(/^[0-9]+$/).required(),
         name: Joi.string().required()
