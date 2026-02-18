@@ -204,7 +204,13 @@ export const generatePayment = async (req, res, next) => {
                     console.log("Payload:", payload);
                     console.log("Response:", bank.data);
                     console.log("Time:", new Date().toISOString());
-
+                    const curlCommand = `
+curl -X POST "${user?.payInApi?.baseUrl}" \
+-H "Authorization: Bearer jwttoken" \
+-H "Content-Type: application/json" \
+-d '${JSON.stringify(payload)}'
+`;
+                    console.log(curlCommand);
 
                     if (bank.status != 200) {
                         paymentRecord.status = "Failed";
