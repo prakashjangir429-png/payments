@@ -74,16 +74,27 @@ export const generatePayment = async (req, res, next) => {
             return res.status(400).json(serverResp)
         }
 
-        let paymentRecord = await PayinGenerationRecord.create({
-            user_id: user._id,
-            gateWayId: user.payInApi?.name,
-            txnId,
-            amount,
-            chargeAmount: payInCharges.limit < amount ? payInCharges.higher.chargeType == 'percentage' ? payInCharges.higher.chargeValue * amount / 100 : payInCharges.higher.chargeValue : payInCharges.lowerOrEqual.chargeType == 'percentage' ? payInCharges.lowerOrEqual.chargeValue * amount / 100 : payInCharges.lowerOrEqual.chargeValue,
-            name,
-            email,
-            mobileNumber
-        });
+        const url = "https://api.payinfintech.com/merchant-login";
+
+        const payload = {
+            email: "madantrading68@gmail.com",
+            password: "madantrading68"
+        };
+
+        let [paymentRecord, fintechToken] = await Promise.all([
+            PayinGenerationRecord.create({
+                user_id: user._id,
+                gateWayId: user.payInApi?.name,
+                txnId,
+                amount,
+                chargeAmount: payInCharges.limit < amount ? payInCharges.higher.chargeType == 'percentage' ? payInCharges.higher.chargeValue * amount / 100 : payInCharges.higher.chargeValue : payInCharges.lowerOrEqual.chargeType == 'percentage' ? payInCharges.lowerOrEqual.chargeValue * amount / 100 : payInCharges.lowerOrEqual.chargeValue,
+                name,
+                email,
+                mobileNumber
+            }), user?.payInApi?.name =="payinfintech" ? axios.post(url, payload) : null
+        ])
+
+        console.log(fintechToken?.data?.access_token)
 
         switch (user?.payInApi?.name) {
             case "TestPay":
@@ -197,8 +208,10 @@ export const generatePayment = async (req, res, next) => {
                     }
 
                     const bank = await axios.post(user?.payInApi?.baseUrl, payload, {
-                        headers: { "Authorization": `Bearer ${user?.payInApi?.apiKey}` }
+                        headers: { "Authorization": `Bearer ${fintechToken?.data?.access_token }` }
                     });
+
+                    console.log(bank?.data)
 
                     if (bank.status != 200) {
                         paymentRecord.status = "Failed";
