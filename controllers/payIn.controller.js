@@ -209,7 +209,7 @@ export const generatePayment = async (req, res, next) => {
                         headers: { "Authorization": `Bearer ${fintechToken?.data?.access_token }` }
                     });
 
-                    console.log(bank.data)
+                    // console.log(bank.data)
 
                     if (bank.status != 200) {
                         paymentRecord.status = "Failed";
