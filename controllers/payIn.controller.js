@@ -42,9 +42,45 @@ function generateUpiIntent(paramsString) {
     return `upi://pay?${params.toString()}`;
 }
 
+let tokenData = null;
+
+async function getPhonepeValidToken() {
+    const bufferTime = 120; // Refresh token 2 minutes before expiry
+    const currentTime = Math.floor(Date.now() / 1000); // Convert to seconds
+    if (tokenData && tokenData.expires_at > currentTime + bufferTime) {
+        return tokenData.access_token;
+    }
+    tokenData = await fetchPhonepeAuthToken();
+    return tokenData.access_token;
+}
+
+async function fetchPhonepeAuthToken() {
+    const body = new URLSearchParams({
+        client_id: "SU2602211558468618962783",
+        client_version: 1,
+        client_secret: "3024b722-8a57-40e8-9880-a45e042a672c",
+        grant_type: "client_credentials",
+    }).toString();
+
+    try {
+        const response = await axios.post("https://api.phonepe.com/apis/identity-manager/v1/oauth/token", body, {
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+        });
+
+        const { access_token, expires_at } = response.data;
+        let tokenData = { access_token, expires_at };
+        return tokenData;
+    } catch (error) {
+        console.error("Error fetching token:", error.response?.data || error.message);
+        throw new Error("Failed to fetch authentication token.");
+    }
+}
+
 export const generatePayment = async (req, res, next) => {
     try {
-        const { txnId, amount, name, email, mobileNumber } = req.body;
+        const { txnId, amount, name, email, mobileNumber, redirectUrl, purpose } = req.body;
         const user = req.user;
 
         if (amount < 100) {
@@ -91,7 +127,7 @@ export const generatePayment = async (req, res, next) => {
                 name,
                 email,
                 mobileNumber
-            }), user?.payInApi?.name =="payinfintech" ? axios.post(url, payload) : null
+            }), user?.payInApi?.name == "payinfintech" ? axios.post(url, payload) : null
         ])
 
         switch (user?.payInApi?.name) {
@@ -206,7 +242,7 @@ export const generatePayment = async (req, res, next) => {
                     }
 
                     const bank = await axios.post(user?.payInApi?.baseUrl, payload, {
-                        headers: { "Authorization": `Bearer ${fintechToken?.data?.access_token }` }
+                        headers: { "Authorization": `Bearer ${fintechToken?.data?.access_token}` }
                     });
 
                     // console.log(bank.data)
@@ -222,6 +258,95 @@ export const generatePayment = async (req, res, next) => {
                             paymentRecord.qrData = null;
                             paymentRecord.qrIntent = intent;
                             paymentRecord.refId = bank?.data?.data?.id;
+                            await paymentRecord.save();
+                            return res.status(200).json({
+                                status: "Success",
+                                status_code: 200,
+                                message: "intent generate successfully",
+                                qr_intent: intent,
+                                qr_image: "",
+                                transaction_id: txnId
+                            })
+                        } else {
+                            paymentRecord.status = "Failed";
+                            paymentRecord.failureReason = bank?.data?.message || "Payment gateway error";
+                            await paymentRecord.save();
+                            return res.status(400).json({ status: "Failed", status_code: 400, message: bank?.data?.message || 'Banking Server Down' })
+                        }
+                    }
+                } catch (error) {
+                    if (error.code == 11000) {
+                        return res.status(500).json({ status: "Failed", status_code: 500, message: "trx Id duplicate Find !" })
+                    } else {
+                        return res.status(500).json({ status: "Failed", status_code: 500, message: error.message || "Internel Server Error !" })
+                    }
+                }
+                break;
+            case "phonepelink":
+                try {
+                    const accessToken = await getPhonepeValidToken();
+                    if (!accessToken) {
+                        return res.status(400).json({
+                            status: "Failed",
+                            status_code: 400,
+                            message: "token generation failed, please contact to service provider"
+                        })
+                    }
+                    const payload = {
+                        "merchantOrderId": txnId,
+                        "amount": Number(amount) * 100,
+                        "expireAfter": 1200,
+                        "paymentFlow": {
+                            "type": "PG_CHECKOUT",
+                            "message": purpose,
+                            "merchantUrls": {
+                                "redirectUrl": redirectUrl
+                            },
+                            "disablePaymentRetry": true,
+                            "paymentModeConfig": {
+                                "enabledPaymentModes": [
+                                    {
+                                        "type": "UPI_INTENT"
+                                    },
+                                    {
+                                        "type": "UPI_QR"
+                                    },
+                                    {
+                                        "type": "CARD",
+                                        "cardTypes": [
+                                            "DEBIT_CARD",
+                                            "CREDIT_CARD"
+                                        ]
+                                    }
+                                ]
+                            }
+                        },
+                        "metaInfo": {
+                            "udf1": name,
+                            "udf2": email
+                        }
+                    }
+
+                    const bank = await axios.post(user?.payInApi?.baseUrl, payload, {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `O-Bearer ${accessToken}`,
+                        }
+                    });
+
+                    // console.log(bank.data)
+
+                    if (bank.status != 200) {
+                        paymentRecord.status = "Failed";
+                        paymentRecord.failureReason = bank?.data?.message || "Payment gateway error";
+                        await paymentRecord.save();
+                        return res.status(400).json({ status: "Failed", status_code: 400, message: 'Banking Server Down' })
+                    } else {
+                        if (bank.data?.state == "PENDING") {
+                            const intent = bank?.data?.redirectUrl
+                            paymentRecord.qrData = null;
+                            paymentRecord.qrIntent = intent;
+                            paymentRecord.refId = bank?.data?.orderId;
                             await paymentRecord.save();
                             return res.status(200).json({
                                 status: "Success",
@@ -325,7 +450,6 @@ export const checkPaymentStatus = async (req, res, next) => {
         return next(error)
     }
 };
-
 
 const userLocks = new Map();
 
@@ -497,6 +621,137 @@ export const payinfintechCallback = async (req, res, next) => {
 
 
                     if (status == 'success') {
+                        const user = await User.findOneAndUpdate(
+                            { _id: paymentRecord.user_id },
+                            { $inc: { eWalletBalance: netAmount } },
+                            { new: true, session }
+                        );
+
+                        const payinSuccess = {
+                            user_id: paymentRecord.user_id,
+                            txnId: paymentRecord.txnId,
+                            utr: paymentRecord.utr,
+                            referenceID: paymentRecord?.refId || '',
+                            amount: paymentRecord.amount,
+                            chargeAmount: paymentRecord.chargeAmount,
+                            vpaId: 'abc@upi',
+                            payerName: paymentRecord.name,
+                            status: 'Success',
+                            description: `PayIn successful for txnId ${paymentRecord.txnId}`,
+                        };
+
+                        const walletTransaction = {
+                            userId: paymentRecord.user_id,
+                            amount: paymentRecord.amount,
+                            beforeAmount: user.eWalletBalance - netAmount,
+                            charges: paymentRecord.chargeAmount,
+                            type: 'credit',
+                            afterAmount: user.eWalletBalance,
+                            description: `PayIn successful for txnId ${paymentRecord.txnId}`,
+                            status: 'success',
+                        };
+
+                        await Promise.all([
+                            payinModel.create([payinSuccess], { session }),
+                            EwalletTransaction.create([walletTransaction], { session })
+                        ]);
+
+                        if (userMeta?.payInCallbackUrl) {
+                            try {
+                                axios.post(userMeta.payInCallbackUrl, {
+                                    event: 'payin_success',
+                                    txnId: paymentRecord.txnId,
+                                    status: 'Success',
+                                    status_code: 200,
+                                    amount: paymentRecord.amount,
+                                    gatwayCharge: paymentRecord.chargeAmount,
+                                    utr: paymentRecord.utr,
+                                    vpaId: 'abc@upi',
+                                    txnCompleteDate: new Date(),
+                                    txnStartDate: paymentRecord.createdAt,
+                                    message: 'Payment Received successfully',
+                                })
+                            } catch (error) {
+                                null
+                            }
+                        };
+
+                    } else if (status != 'success') {
+                        if (userMeta?.payInCallbackUrl) {
+                            try {
+                                axios.post(userMeta.payInCallbackUrl, {
+                                    event: 'payin_failed',
+                                    txnId: paymentRecord.txnId,
+                                    status: 'Failed',
+                                    status_code: 200,
+                                    amount: paymentRecord.amount,
+                                    utr: null,
+                                    vpaId: null,
+                                    txnStartDate: paymentRecord.createdAt,
+                                    message: 'Payment failed',
+                                })
+                            } catch (error) {
+                                null
+                            }
+                        };
+                    }
+                })
+            } finally {
+                session.endSession();
+            }
+        });
+
+        return res.status(200).json({
+            status: 'Success',
+            status_code: 200,
+            message: 'Payment status updated successfully',
+        });
+    } catch (error) {
+        return next(error);
+    }
+};
+
+export const phonepeCallback = async (req, res, next) => {
+    try {
+        const { event, payload } = req.body;
+        if (!event && !payload) {
+            return res.status(200).json({ message: "Invalid request format" });
+        }
+        const { txnId, utr, status, paymentMethod: message } = {txnId: payload?.merchantOrderId, utr: payload?.paymentDetails[0]?.rail?.utr || payload?.orderId, status: payload?.state, paymentMethod: payload?.paymentDetails?.paymentMode};
+
+        const paymentRecord = await PayinGenerationRecord.findOneAndUpdate(
+            { txnId, status: 'Pending' },
+            {
+                $set: {
+                    status: (status === 'COMPLETED' && event == "checkout.order.completed") ? 'Success' : 'Failed',
+                    ...((status === 'COMPLETED' && event == "checkout.order.completed") && { utr }),
+                    ...(status === 'FAILED' && { failureReason: message || 'Payment failed' }),
+                },
+            },
+            { new: true }
+        );
+
+        if (!paymentRecord) {
+            return res.status(200).json({
+                status: 'Failed',
+                status_code: 404,
+                message: 'Transaction not found or already processed',
+            });
+        }
+
+        const userId = paymentRecord.user_id.toString();
+        const userMutex = getUserMutex(userId);
+
+        await userMutex.runExclusive(async () => {
+            const session = await mongoose.startSession();
+            try {
+                await session.withTransaction(async () => {
+                    const netAmount = paymentRecord.amount - paymentRecord.chargeAmount;
+
+                    let userMeta = await userMetaModel.findOne({ userId: paymentRecord.user_id }).session(session);
+
+
+                    if (status === 'COMPLETED' && event == "checkout.order.completed") {
                         const user = await User.findOneAndUpdate(
                             { _id: paymentRecord.user_id },
                             { $inc: { eWalletBalance: netAmount } },

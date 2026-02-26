@@ -1,7 +1,7 @@
 import express from "express";
 import { celebrate } from "celebrate";
 import Joi from 'joi';
-import { generatePayment, checkPaymentStatus, payinCallback, payuCallback, payinfintechCallback } from "../controllers/payIn.controller.js";
+import { generatePayment, checkPaymentStatus, payinCallback, payuCallback, payinfintechCallback, phonepeCallback } from "../controllers/payIn.controller.js";
 import { verifyToken } from "../middleware/apiToken.js";
 
 const createPayInSchema = {
@@ -16,6 +16,23 @@ const createPayInSchema = {
         'authorization': Joi.string().required()
     }).unknown(true)
 };
+
+const paylinkSchema = {
+    body: Joi.object({
+        txnId: Joi.string().min(12).max(20).required(),
+        amount: Joi.number().min(300).max(10000).required(),
+        redirectUrl: Joi.string().uri().required(),
+        email: Joi.string().email().required(),
+        mobileNumber: Joi.string().pattern(/^[0-9]+$/).required(),
+        name: Joi.string().required(),
+        purpose: Joi.string().required()
+
+    }),
+    headers: Joi.object({
+        'authorization': Joi.string().required()
+    }).unknown(true)
+};
+
 const router = express.Router();
 
 router.post(
@@ -23,6 +40,13 @@ router.post(
     celebrate(createPayInSchema), verifyToken,
     generatePayment
 );
+
+router.post(
+    "/paylink",
+    celebrate(paylinkSchema), verifyToken,
+    generatePayment
+);
+
 
 // {
 //     "status": true,
@@ -100,6 +124,10 @@ router.post(
 
 router.post(
     "/payinfintech", payinfintechCallback
+);
+
+router.post(
+    "/phonepe", phonepeCallback
 );
 
 router.post(
