@@ -125,7 +125,7 @@ export const generatePayOut = async (req, res, next) => {
                     gatewayCharge: chargeAmount,
                     mobileNumber,
                     status: "Pending"
-                }), user?.payOutApi?.name == "payinfintech" ? axios.post(url, tokenPayload) : null]
+                }), user?.payOutApi?.name == "payinfintech" ? axios.post(url, tokenPayload) : null]);
 
                 try {
                     let payload = {
