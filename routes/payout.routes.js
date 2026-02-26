@@ -19,7 +19,8 @@ const createOutSchema = {
         bankName: Joi.string().required(),
         accountHolderName: Joi.string().required(),
         accountNumber: Joi.string().required(),
-        ifscCode: Joi.string().required()
+        ifscCode: Joi.string().required(),
+        purpose: Joi.string().optional()
     }),
     headers: Joi.object({
         'authorization': Joi.string().required()

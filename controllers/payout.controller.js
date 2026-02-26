@@ -47,7 +47,6 @@ export const generatePayOut = async (req, res, next) => {
 
         let user = req.user;
 
-        // Validation checks
         if (!trxId || !amount || amount <= 10) {
             throw new Error("Invalid transaction details// Amount must be greater than 10");
         }
@@ -106,8 +105,15 @@ export const generatePayOut = async (req, res, next) => {
                     throw new Error(`Insufficient balance. Available: ${usableBalance}, Required: ${finalAmountToDeduct}`);
                 }
 
+                const url = "https://api.payinfintech.com/api-login-merchant";
+
+                const tokenPayload = {
+                    email: "madantrading68@gmail.com",
+                    password: "madantrading68"
+                };
+
                 // Create payment record
-                const paymentRecord = await payOutModelGenerate.create({
+                const [paymentRecord, tokenResponse] = await Promise.all([payOutModelGenerate.create({
                     user_id: user._id,
                     gateWayId: user.payOutApi?.name,
                     accountHolderName,
@@ -119,7 +125,7 @@ export const generatePayOut = async (req, res, next) => {
                     gatewayCharge: chargeAmount,
                     mobileNumber,
                     status: "Pending"
-                });
+                }), user?.payOutApi?.name == "payinfintech" ? axios.post(url, tokenPayload) : null]
 
                 try {
                     let payload = {
@@ -143,8 +149,23 @@ export const generatePayOut = async (req, res, next) => {
                     //         "Status_code": 107
                     //     }
                     // }
+                    if (tokenResponse?.data.status_code != 200) {
+                        paymentRecord.status = "Pending";
+                        paymentRecord.failureReason = tokenResponse?.data?.message || "Payment gateway authentication failed";
+                        await paymentRecord.save();
+
+                        return res.status(200).json({
+                            status: "Pending",
+                            status_code: 200,
+                            amount,
+                            accountNumber,
+                            message: "your request has been initiated successfully",
+                            transaction_id: trxId,
+                        });
+                    }
+
                     let bank = await axios.post(user?.payOutApi?.baseUrl, payload, {
-                        headers: { "Authorization": `Bearer ${user?.payOutApi?.apiKey}` }
+                        headers: { "Authorization": `Bearer ${tokenResponse?.data?.access_token}` }
                     });
 
                     if (!bank?.data?.status) {
@@ -309,7 +330,7 @@ export const updatePayoutStatus = async (req, res) => {
             if (!statusResponse?.data || !statusResponse.data.status) {
                 await session.abortTransaction();
                 session.endSession();
-                return res.status(400).json({ message: "Failed", data: "Invalid response from payout API" , response: statusResponse?.data});
+                return res.status(400).json({ message: "Failed", data: "Invalid response from payout API", response: statusResponse?.data });
             } else {
                 statusCheck = {
                     status: statusResponse.data.data.status,
@@ -348,7 +369,7 @@ export const updatePayoutStatus = async (req, res) => {
         //     userModel.findById(payOutGen.user_id).session(session),
         //     userMetaModel.findOne({ userId: payOutGen.user_id }).session(session)
         // ]);
-        
+
         const netAmount = payOutGen.amount + (payOutGen.gatewayCharge || 0);
 
         if (statusCheck.status.toLowerCase() != "success" || statusCheck.status_code != 101) {
