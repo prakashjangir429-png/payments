@@ -83,11 +83,11 @@ export const generatePayment = async (req, res, next) => {
         const { txnId, amount, name, email, mobileNumber, redirectUrl, purpose } = req.body;
         const user = req.user;
 
-        if (amount < 100) {
+        if (amount < 50) {
             return res.status(400).json({
                 status: "Failed",
                 status_code: 400,
-                message: "Amount should be more than 100"
+                message: "Amount should be more than 50"
             });
         }
 

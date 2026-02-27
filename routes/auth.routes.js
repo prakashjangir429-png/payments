@@ -15,7 +15,8 @@ import {
   bulkSwitchApis,
   bankSettlement,
   eWalletToMainWalletSettlement,
-  mainWalletToEWalletSettlement
+  mainWalletToEWalletSettlement,
+  generateToken
 } from '../controllers/auth.controller.js';
 import { protect, restrictTo } from '../middleware/auth.js';
 
@@ -29,6 +30,9 @@ router.get('/profile', getUserProfile);
 router.put('/profile', updateUserProfile);
 router.put('/bank_details', updateBankDetails)
 router.put('/change-password', changePassword);
+
+router.get('/api_token', generateToken);
+
 // router.put('/change-trx-password', changeTrxPassword);
 
 router.use(restrictTo('Admin'))
@@ -41,8 +45,8 @@ router.post('/:userId', updateUserByAdmin);
 
 router.put('/switch/:userId', switchUserApis);
 router.put('/bulk', bulkSwitchApis);
-router.post('/settlement/bank',bankSettlement)
-router.post("/settlement/wallet",eWalletToMainWalletSettlement)
-router.post("/settlement/maintoEwallet",mainWalletToEWalletSettlement)
+router.post('/settlement/bank', bankSettlement)
+router.post("/settlement/wallet", eWalletToMainWalletSettlement)
+router.post("/settlement/maintoEwallet", mainWalletToEWalletSettlement)
 
 export default router;

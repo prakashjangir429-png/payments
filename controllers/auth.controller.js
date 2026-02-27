@@ -6,6 +6,7 @@ import EwalletTransaction from '../models/ewallet.model.js';
 import MainWalletTransaction from '../models/mainWallet.model.js';
 import payoutRecordModel from '../models/payoutRecord.model.js';
 import settlementModel from '../models/settlement.model.js';
+import jwt from 'jsonwebtoken';
 
 const generateTokens = (user) => {
   const accessToken = user.generateAccessToken();
@@ -916,5 +917,38 @@ export const mainWalletToEWalletSettlement = async (req, res, next) => {
     }
   } catch (error) {
     return next(error);
+  }
+};
+
+
+export const generateToken = async (req, res) => {
+  const user = req.user;
+  try {
+    const payload = {
+      clientId: user.clientId,
+      userName: user.userName,
+    };
+
+    const token = jwt.sign(
+      payload,
+      user.clientSecret,
+      {
+        algorithm: "HS256",
+        expiresIn: "1h",
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Token generated successfully",
+      token
+    });
+
+  } catch (error) {
+    console.error("Token generation error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to generate token",
+    });
   }
 };
