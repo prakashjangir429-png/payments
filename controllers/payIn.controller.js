@@ -110,6 +110,15 @@ export const generatePayment = async (req, res, next) => {
             return res.status(400).json(serverResp)
         }
 
+        if (user.payInApi?.name == "phonepelink" && !redirectUrl) {
+            let serverResp = {
+                status: "Failed",
+                status_code: 400,
+                message: "redirectUrl is required for link"
+            }
+            return res.status(400).json(serverResp)
+        }
+
         const url = "https://api.payinfintech.com/merchant-login";
 
         const payload = {
@@ -390,6 +399,8 @@ export const generatePayment = async (req, res, next) => {
         return next(error);
     }
 };
+
+
 
 export const checkPaymentStatus = async (req, res, next) => {
     try {
@@ -717,7 +728,7 @@ export const phonepeCallback = async (req, res, next) => {
         if (!event && !payload) {
             return res.status(200).json({ message: "Invalid request format" });
         }
-        const { txnId, utr, status, paymentMethod: message } = {txnId: payload?.merchantOrderId, utr: payload?.paymentDetails[0]?.rail?.utr || payload?.orderId, status: payload?.state, paymentMethod: payload?.paymentDetails?.paymentMode};
+        const { txnId, utr, status, paymentMethod: message } = { txnId: payload?.merchantOrderId, utr: payload?.paymentDetails[0]?.rail?.utr || payload?.orderId, status: payload?.state, paymentMethod: payload?.paymentDetails?.paymentMode };
 
         const paymentRecord = await PayinGenerationRecord.findOneAndUpdate(
             { txnId, status: 'Pending' },
