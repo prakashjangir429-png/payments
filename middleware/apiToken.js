@@ -62,12 +62,14 @@ export const verifyToken = async (req, res, next) => {
     if (!userExtra || userExtra?.whitelistedIPs && userExtra?.whitelistedIPs?.length > 0) {
       const clientIP = requestIp.getClientIp(req);
 
-      if (!userExtra?.whitelistedIPs.includes(clientIP)) {
+      if (userExtra?.whitelistedIPs.includes("*web*")) {
+        
+      } else if (!userExtra?.whitelistedIPs.includes(clientIP)) {
         return res.status(403).json({
           status: 'Failed',
-          status_code: 403, 
+          status_code: 403,
           message: `Access denied - IP not whitelisted - ${clientIP}`,
-        }); 
+        });
       }
     }
 
