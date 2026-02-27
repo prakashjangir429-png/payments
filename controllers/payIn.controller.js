@@ -311,24 +311,7 @@ export const generatePayment = async (req, res, next) => {
                             "merchantUrls": {
                                 "redirectUrl": redirectUrl
                             },
-                            "disablePaymentRetry": true,
-                            "paymentModeConfig": {
-                                "enabledPaymentModes": [
-                                    {
-                                        "type": "UPI_INTENT"
-                                    },
-                                    {
-                                        "type": "UPI_QR"
-                                    },
-                                    {
-                                        "type": "CARD",
-                                        "cardTypes": [
-                                            "DEBIT_CARD",
-                                            "CREDIT_CARD"
-                                        ]
-                                    }
-                                ]
-                            }
+                            "disablePaymentRetry": true
                         },
                         "metaInfo": {
                             "udf1": name,
