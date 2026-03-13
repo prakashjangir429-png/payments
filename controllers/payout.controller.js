@@ -70,7 +70,7 @@ export const generatePayOut = async (req, res, next) => {
 
         switch (user?.payOutApi?.name) {
             case "payinfintech":
-                let chargeAmount = payOutCharges.limit < amount ?
+                const chargeAmount = payOutCharges.limit < amount ?
                     payOutCharges.higher.chargeType == 'percentage' ?
                         payOutCharges.higher.chargeValue * amount / 100 :
                         payOutCharges.higher.chargeValue :
@@ -128,6 +128,148 @@ export const generatePayOut = async (req, res, next) => {
                 }), user?.payOutApi?.name == "payinfintech" ? axios.post(url, tokenPayload) : null]);
 
                 try {
+                    let payload = {
+                        "Amount": amount,
+                        "AccountNumber": accountNumber,
+                        "Bank": bankName,
+                        "IFSC": ifscCode,
+                        "Mode": "IMPS",
+                        "OrderId": trxId,
+                        "Mobile": mobileNumber,
+                        "BenificalName": accountHolderName
+                    }
+
+                    // let bank = {
+                    //     data: {
+                    //         "status": true,
+                    //         "message": "your request has been initiated successfully",
+                    //         "data": {
+                    //             "txnId": "PFO1527831140336875", "amount": "10.00", "status": "INITIATE", "bankName": "State Bank of India", "accountNumber": "38447128670", "ifscCode": "SBIN0032299", "mode": "IMPS", "orderid": 12345678912345
+                    //         },
+                    //         "Status_code": 107
+                    //     }
+                    // }
+                    if (tokenResponse?.data.status_code != 200) {
+                        paymentRecord.status = "Pending";
+                        paymentRecord.failureReason = tokenResponse?.data?.message || "Payment gateway authentication failed";
+                        await paymentRecord.save();
+
+                        return res.status(200).json({
+                            status: "Pending",
+                            status_code: 200,
+                            amount,
+                            accountNumber,
+                            message: "your request has been initiated successfully",
+                            transaction_id: trxId,
+                        });
+                    }
+
+                    let bank = await axios.post(user?.payOutApi?.baseUrl, payload, {
+                        headers: { "Authorization": `Bearer ${tokenResponse?.data?.access_token}` }
+                    });
+
+                    if (!bank?.data?.status) {
+                        paymentRecord.status = "Pending";
+                        paymentRecord.failureReason = bank?.data?.message || "Payment gateway error";
+                        await paymentRecord.save();
+
+                        return res.status(200).json({
+                            status: "Pending",
+                            status_code: 200,
+                            amount,
+                            accountNumber,
+                            message: "your request has been initiated successfully",
+                            transaction_id: trxId,
+                        });
+
+                    } else {
+                        paymentRecord.status = "Pending";
+                        await paymentRecord.save();
+                        return res.status(200).json({
+                            status: "Pending",
+                            status_code: 200,
+                            amount,
+                            accountNumber,
+                            message: "your request has been initiated successfully",
+                            transaction_id: trxId,
+                        });
+                    }
+                } catch (error) {
+
+                    if (error.code == 11000) {
+                        return res.status(500).json({
+                            status: "Failed",
+                            status_code: 500,
+                            message: "trx Id duplicate Find !"
+                        });
+                    } else {
+                        return res.status(500).json({
+                            status: "Failed",
+                            status_code: 500,
+                            message: error.message || "Internal Server Error !"
+                        });
+                    }
+                }
+                break;
+            case "vjaypayout":
+                try {
+                const chargeAmount = payOutCharges.limit < amount ?
+                    payOutCharges.higher.chargeType == 'percentage' ?
+                        payOutCharges.higher.chargeValue * amount / 100 :
+                        payOutCharges.higher.chargeValue :
+                    payOutCharges.lowerOrEqual.chargeType == 'percentage' ?
+                        payOutCharges.lowerOrEqual.chargeValue * amount / 100 :
+                        payOutCharges.lowerOrEqual.chargeValue;
+
+                const finalAmountToDeduct = amount + chargeAmount;
+
+                const updatedUser = await userModel.findOneAndUpdate(
+                    {
+                        _id: user._id,
+                        $expr: {
+                            $gte: [
+                                { $subtract: ["$upiWalletBalance", "$minWalletBalance"] },
+                                finalAmountToDeduct
+                            ]
+                        }
+                    },
+                    {
+                        $inc: { upiWalletBalance: -finalAmountToDeduct }
+                    },
+                    {
+                        new: true,
+                        runValidators: true
+                    }
+                );
+
+                if (!updatedUser) {
+                    const currentUser = await userModel.findById(user._id);
+                    const usableBalance = currentUser.upiWalletBalance - currentUser.minWalletBalance;
+                    throw new Error(`Insufficient balance. Available: ${usableBalance}, Required: ${finalAmountToDeduct}`);
+                }
+
+                const url = "https://admin.finwaypay.com/api/v1.1/t1/withdrawal";
+
+                const tokenPayload = {
+                    email: "madantrading68@gmail.com",
+                    password: "madantrading68"
+                };
+
+                // Create payment record
+                const [paymentRecord, tokenResponse] = await Promise.all([payOutModelGenerate.create({
+                    user_id: user._id,
+                    gateWayId: user.payOutApi?.name,
+                    accountHolderName,
+                    accountNumber,
+                    ifscCode,
+                    bankName,
+                    trxId,
+                    amount,
+                    gatewayCharge: chargeAmount,
+                    mobileNumber,
+                    status: "Pending"
+                }), user?.payOutApi?.name == "payinfintech" ? axios.post(url, tokenPayload) : null]);
+
                     let payload = {
                         "Amount": amount,
                         "AccountNumber": accountNumber,

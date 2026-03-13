@@ -11,7 +11,7 @@ const createOutSchema = {
     body: Joi.object({
         trxId: Joi.number()
             .integer()
-            .min(1000000000000)
+            .min(100000000000)
             .max(9999999999999999)
             .required(),
         amount: Joi.number().required().min(10).max(5000),
