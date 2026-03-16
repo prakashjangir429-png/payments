@@ -128,6 +128,7 @@ export const loginUser = async (req, res, next) => {
       refreshToken
     });
   } catch (error) {
+    console.log(error)
     return next(error);
   }
 };
