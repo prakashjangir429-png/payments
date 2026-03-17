@@ -310,6 +310,8 @@ export const generatePayment = async (req, res, next) => {
                         }
                     );
 
+                    console.log(bank.data)
+
                     if (bank.status != 200) {
                         paymentRecord.status = "Failed";
                         paymentRecord.failureReason = bank?.data?.message || "Payment gateway error";
