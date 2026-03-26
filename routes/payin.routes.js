@@ -1,7 +1,7 @@
 import express from "express";
 import { celebrate } from "celebrate";
 import Joi from 'joi';
-import { generatePayment, checkPaymentStatus, payinCallback, payuCallback, payinfintechCallback, phonepeCallback, vjayjaipurCallback } from "../controllers/payIn.controller.js";
+import { generatePayment, checkPaymentStatus, payinCallback, payuCallback, payinfintechCallback, phonepeCallback, vjayjaipurCallback,amitjaipurCallback } from "../controllers/payIn.controller.js";
 import { verifyToken } from "../middleware/apiToken.js";
 
 const createPayInSchema = {
@@ -134,6 +134,10 @@ router.post(
 
 router.post(
     "/payu", payuCallback
+);
+
+router.post(
+    "/webhook", amitjaipurCallback
 );
 
 export default router;
