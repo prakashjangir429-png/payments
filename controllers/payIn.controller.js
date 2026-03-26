@@ -959,7 +959,11 @@ export const amitjaipurCallback = async (req, res, next) => {
 
         console.log(req.body)
 
-        res.send("success")
+        return res.status(200).json({
+            status: 'Success',
+            status_code: 200,
+            message: 'Payment status updated successfully',
+        });
 
         // Body: {
         //   amount: '100.00',
