@@ -957,13 +957,11 @@ export const amitjaipurCallback = async (req, res, next) => {
     try {
         const { reference: txnId, utr, status, amount, message } = req.body;
 
-        console.log(req.body)
-
-        return res.status(200).json({
-            status: 'Success',
-            status_code: 200,
-            message: 'Payment status updated successfully',
-        });
+        // return res.status(200).json({
+        //     status: 'Success',
+        //     status_code: 200,
+        //     message: 'Payment status updated successfully',
+        // });
 
         // Body: {
         //   amount: '100.00',
@@ -977,9 +975,9 @@ export const amitjaipurCallback = async (req, res, next) => {
             { txnId, status: 'Pending' },
             {
                 $set: {
-                    status: status === 'Success' ? 'Success' : 'Failed',
-                    ...(status === 'Success' && { utr }),
-                    ...(status != 'Success' && { failureReason: message || 'Payment failed' }),
+                    status: status === 'success' ? 'Success' : 'Failed',
+                    ...(status === 'success' && { utr }),
+                    ...(status != 'success' && { failureReason: message || 'Payment failed' }),
                 },
             },
             { new: true }
@@ -1005,7 +1003,7 @@ export const amitjaipurCallback = async (req, res, next) => {
                     let userMeta = await userMetaModel.findOne({ userId: paymentRecord.user_id }).session(session);
 
 
-                    if (status == 'Success') {
+                    if (status == 'success') {
                         const user = await User.findOneAndUpdate(
                             { _id: paymentRecord.user_id },
                             { $inc: { eWalletBalance: netAmount } },
@@ -1057,11 +1055,11 @@ export const amitjaipurCallback = async (req, res, next) => {
                                     message: 'Payment Received successfully',
                                 })
                             } catch (error) {
-                                null
+                                console.log(error)
                             }
                         };
 
-                    } else if (status != 'Success') {
+                    } else if (status != 'success') {
                         if (userMeta?.payInCallbackUrl) {
                             try {
                                 axios.post(userMeta.payInCallbackUrl, {
@@ -1076,7 +1074,7 @@ export const amitjaipurCallback = async (req, res, next) => {
                                     message: 'Payment failed',
                                 })
                             } catch (error) {
-                                null
+                                console.log(error)
                             }
                         };
                     }
