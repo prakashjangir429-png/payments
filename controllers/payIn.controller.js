@@ -955,7 +955,10 @@ export const vjayjaipurCallback = async (req, res, next) => {
 
 export const amitjaipurCallback = async (req, res, next) => {
     try {
-        const { reference: txnId, utr, status, amount, message } = req.query;
+        const { reference: txnId, utr, status, amount, message } = req.body;
+
+        console.log("req.query", req.query);
+        console.log("req.body", req.body);
 
         // return res.status(200).json({
         //     status: 'Success',
