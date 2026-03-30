@@ -109,8 +109,6 @@ export const verifyUserForPasswordReset = catchAsync(async (req, res, next) => {
   user.verificationTokenExpires = Date.now() + 5 * 60 * 1000; // 15 minutes
   await user.save();
 
-  user.clientSecret = undefined;
-
   res.status(200).json({
     status: "Success",
     status_code: 200,

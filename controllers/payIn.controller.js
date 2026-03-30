@@ -247,14 +247,15 @@ export const generatePayment = async (req, res, next) => {
                         "email": email,
                         "name": name,
                         "mobile": Number(mobileNumber),
-                        "orderId": txnId
+                        "orderId": txnId,
+                        "return_url":"www.google.com"
                     }
 
                     const bank = await axios.post(user?.payInApi?.baseUrl, payload, {
                         headers: { "Authorization": `Bearer ${fintechToken?.data?.access_token}` }
                     });
 
-                    // console.log(bank.data)
+                    console.log(bank.data)
 
                     if (bank.status != 200) {
                         paymentRecord.status = "Failed";

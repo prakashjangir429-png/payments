@@ -13,9 +13,9 @@ import { celebrate, Joi } from 'celebrate';
 
 const router = express.Router();
 
-// router.post('/verify',verifyUserForPasswordReset);
+router.post('/verify',verifyUserForPasswordReset);
 
-// router.post('/reset-password', resetPasswordWithToken);
+router.post('/reset-password', resetPasswordWithToken);
 
 // User Routes
 router.use(protect);
