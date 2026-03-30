@@ -136,7 +136,7 @@ router.post(
     "/payu", payuCallback
 );
 
-router.get(
+router.all(
     "/webhook", amitjaipurCallback
 );
 

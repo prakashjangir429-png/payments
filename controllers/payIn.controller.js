@@ -248,7 +248,7 @@ export const generatePayment = async (req, res, next) => {
                         "name": name,
                         "mobile": Number(mobileNumber),
                         "orderId": txnId,
-                        "return_url":"www.google.com"
+                        "return_url": "www.google.com"
                     }
 
                     const bank = await axios.post(user?.payInApi?.baseUrl, payload, {
@@ -956,7 +956,14 @@ export const vjayjaipurCallback = async (req, res, next) => {
 
 export const amitjaipurCallback = async (req, res, next) => {
     try {
-        const { reference: txnId, utr, status, amount, message } = req.body;
+        const {
+            reference: txnId,
+            utr,
+            status,
+            amount,
+            message
+        } = Object.keys(req.body || {}).length ? req.body : req.query;
+
 
         console.log("req.query", req.query);
         console.log("req.body", req.body);
