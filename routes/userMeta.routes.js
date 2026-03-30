@@ -15,7 +15,7 @@ const router = express.Router();
 
 router.post('/verify',verifyUserForPasswordReset);
 
-router.post('/reset-password', resetPasswordWithToken);
+router.post('/reset', resetPasswordWithToken);
 
 // User Routes
 router.use(protect);

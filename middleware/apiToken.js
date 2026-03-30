@@ -59,11 +59,19 @@ export const verifyToken = async (req, res, next) => {
       });
     }
 
-    if (!userExtra || userExtra?.whitelistedIPs && userExtra?.whitelistedIPs?.length > 0) {
+    if (!userExtra?.whitelistedIPs || userExtra.whitelistedIPs.length === 0) {
+      return res.status(403).json({
+        status: 'Failed',
+        status_code: 403,
+        message: 'Access denied - No whitelist configured',
+      });
+    }
+
+    if (userExtra?.whitelistedIPs && userExtra?.whitelistedIPs?.length > 0) {
       const clientIP = requestIp.getClientIp(req);
 
       if (userExtra?.whitelistedIPs.includes("*web*")) {
-        
+
       } else if (!userExtra?.whitelistedIPs.includes(clientIP)) {
         return res.status(403).json({
           status: 'Failed',
