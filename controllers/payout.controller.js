@@ -631,7 +631,8 @@ export const generatePayOut = async (req, res, next) => {
                         headers: {
                             'X-Merchant-Key': 'MER-KPRPXZELXN',
                             'X-API-Key': user.payOutApi?.apiKey
-                        }
+                        },
+                        validateStatus: () => true
                     });
 
                     if (!bank?.data?.status) {
