@@ -743,148 +743,192 @@ export const updatePayoutStatus = async (req, res) => {
 };
 
 const schedulePayoutStatusCheck = (trxId) => {
-  setTimeout(async () => {
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    setTimeout(async () => {
+        const session = await mongoose.startSession();
+        session.startTransaction();
 
-    try {
-      console.log(`Checking payout status for trxId: ${trxId}`);
+        try {
+            console.log(`Checking payout status for trxId: ${trxId}`);
 
-      const isPending = await payOutModelGenerate
-        .findOne({ trxId, status: "Pending" })
-        .session(session);
+            const isPending = await payOutModelGenerate
+                .findOne({ trxId, status: "Pending" })
+                .session(session);
 
-      if (!isPending) {
-        await session.abortTransaction();
-        session.endSession();
-        return;
-      }
+            if (!isPending) {
+                await session.abortTransaction();
+                session.endSession();
+                return;
+            }
 
-      const payoutApi = await payoutApisModel
-        .findOne({ name: isPending.gateWayId })
-        .session(session);
+            const payoutApi = await payoutApisModel
+                .findOne({ name: isPending.gateWayId })
+                .session(session);
 
-      if (!payoutApi) {
-        await session.abortTransaction();
-        session.endSession();
-        return;
-      }
+            if (!payoutApi) {
+                await session.abortTransaction();
+                session.endSession();
+                return;
+            }
 
-      let statusCheck;
+            let statusCheck;
 
-      if (payoutApi.name === "payinfintech") {
-        const payload = { orderid: trxId };
+            if (payoutApi.name === "payinfintech") {
+                const payload = { orderid: trxId };
 
-        const statusResponse = await axios.post(
-          `https://api.payinfintech.com/webhook/payout/checkstatus`,
-          payload
-        );
+                const statusResponse = await axios.post(
+                    `https://api.payinfintech.com/webhook/payout/checkstatus`,
+                    payload
+                );
 
-        if (!statusResponse?.data?.status) {
-          await session.abortTransaction();
-          session.endSession();
-          return;
+                if (!statusResponse?.data?.status) {
+                    await session.abortTransaction();
+                    session.endSession();
+                    return;
+                }
+
+                statusCheck = {
+                    status: statusResponse.data.data.status,
+                    message: statusResponse.data.message,
+                    status_code: statusResponse.data.status_code,
+                    amount: statusResponse.data.data.amount,
+                    utr: statusResponse.data.data.utr,
+                    optxId: statusResponse.data.data.txnId,
+                };
+            }
+            if (payoutApi.name === "amitjaipur") {
+                const payload = { orderid: trxId };
+
+                const statusResponse = await axios.post(
+                    `https://api.payinfintech.com/webhook/payout/checkstatus`,
+                    payload
+                );
+
+                if (!statusResponse?.data?.status) {
+                    await session.abortTransaction();
+                    session.endSession();
+                    return;
+                }
+
+                statusCheck = {
+                    status: statusResponse.data.data.status,
+                    message: statusResponse.data.message,
+                    status_code: statusResponse.data.status_code,
+                    amount: statusResponse.data.data.amount,
+                    utr: statusResponse.data.data.utr,
+                    optxId: statusResponse.data.data.txnId,
+                };
+            }
+
+            const payOutGen = await payOutModelGenerate.findOneAndUpdate(
+                { trxId },
+                {
+                    $set: {
+                        status:
+                            statusCheck.status === "success" ||
+                                statusCheck.status_code === 101
+                                ? "Success"
+                                : "Failed",
+                        utr: statusCheck.utr,
+                        failureReason:
+                            statusCheck.status !== "success"
+                                ? statusCheck.message
+                                : null,
+                    },
+                },
+                { new: true, session }
+            );
+
+            const userMeta = await userMetaModel
+                .findOne({ userId: payOutGen.user_id })
+                .session(session);
+
+            const netAmount =
+                payOutGen.amount + (payOutGen.gatewayCharge || 0);
+
+            // ❌ FAILED CASE
+            if (
+                statusCheck.status.toLowerCase() !== "success" ||
+                statusCheck.status_code !== 101
+            ) {
+                await userModel.findByIdAndUpdate(
+                    payOutGen.user_id,
+                    { $inc: { upiWalletBalance: +Number(netAmount) } },
+                    { session }
+                );
+
+                if (userMeta?.payOutCallbackUrl) {
+                    try {
+                        axios.post(userMeta.payOutCallbackUrl, {
+                            event: "payout_failed",
+                            txnId: trxId,
+                            status: "Failed",
+                            status_code: 400,
+                            amount: payOutGen.amount,
+                            utr: null,
+                            vpaId: null,
+                            txnStartDate: payOutGen.createdAt,
+                            message: 'Payment failed'
+                        });
+                    } catch (error) {
+                        null
+                    }
+                }
+
+                await session.commitTransaction();
+                session.endSession();
+                return;
+            }
+
+            // ✅ SUCCESS CASE
+            if (!statusCheck.utr) {
+                await session.abortTransaction();
+                session.endSession();
+                return;
+            }
+
+            await payOutModel.create(
+                [
+                    {
+                        user_id: payOutGen.user_id,
+                        amount: payOutGen.amount,
+                        chargeAmount: payOutGen.gatewayCharge || 0,
+                        finalAmount: netAmount,
+                        utr: statusCheck.utr,
+                        referenceID: statusCheck.optxId,
+                        trxId,
+                        isSuccess: "Success",
+                    },
+                ],
+                { session }
+            );
+
+            if (userMeta?.payOutCallbackUrl) {
+                try {
+                    axios.post(userMeta.payOutCallbackUrl, {
+                        event: "payout_success",
+                        txnId: trxId,
+                        status: "Success",
+                        status_code: 200,
+                        amount: payOutGen.amount,
+                        chargeAmount: payOutGen.gatewayCharge || 0,
+                        netAmount: netAmount,
+                        utr: statusCheck.utr,
+                        txnStartDate: payOutGen.createdAt,
+                        message: 'Payment success'
+                    });
+                } catch (error) {
+                    null
+                }
+            }
+
+            await session.commitTransaction();
+            session.endSession();
+
+            console.log(`Payout processed for ${trxId}`);
+        } catch (error) {
+            console.error("Scheduler Error:", error);
+            await session.abortTransaction();
+            session.endSession();
         }
-
-        statusCheck = {
-          status: statusResponse.data.data.status,
-          message: statusResponse.data.message,
-          status_code: statusResponse.data.status_code,
-          amount: statusResponse.data.data.amount,
-          utr: statusResponse.data.data.utr,
-          optxId: statusResponse.data.data.txnId,
-        };
-      }
-
-      const payOutGen = await payOutModelGenerate.findOneAndUpdate(
-        { trxId },
-        {
-          $set: {
-            status:
-              statusCheck.status === "success" ||
-              statusCheck.status_code === 101
-                ? "Success"
-                : "Failed",
-            utr: statusCheck.utr,
-            failureReason:
-              statusCheck.status !== "success"
-                ? statusCheck.message
-                : null,
-          },
-        },
-        { new: true, session }
-      );
-
-      const userMeta = await userMetaModel
-        .findOne({ userId: payOutGen.user_id })
-        .session(session);
-
-      const netAmount =
-        payOutGen.amount + (payOutGen.gatewayCharge || 0);
-
-      // ❌ FAILED CASE
-      if (
-        statusCheck.status.toLowerCase() !== "success" ||
-        statusCheck.status_code !== 101
-      ) {
-        await userModel.findByIdAndUpdate(
-          payOutGen.user_id,
-          { $inc: { upiWalletBalance: +Number(netAmount) } },
-          { session }
-        );
-
-        if (userMeta?.payOutCallbackUrl) {
-          axios.post(userMeta.payOutCallbackUrl, {
-            event: "payout_failed",
-            txnId: trxId,
-            status: "Failed",
-          });
-        }
-
-        await session.commitTransaction();
-        session.endSession();
-        return;
-      }
-
-      // ✅ SUCCESS CASE
-      if (!statusCheck.utr) {
-        await session.abortTransaction();
-        session.endSession();
-        return;
-      }
-
-      await payOutModel.create(
-        [
-          {
-            user_id: payOutGen.user_id,
-            amount: payOutGen.amount,
-            chargeAmount: payOutGen.gatewayCharge || 0,
-            finalAmount: netAmount,
-            utr: statusCheck.utr,
-            referenceID: statusCheck.optxId,
-            trxId,
-            isSuccess: "Success",
-          },
-        ],
-        { session }
-      );
-
-      if (userMeta?.payOutCallbackUrl) {
-        axios.post(userMeta.payOutCallbackUrl, {
-          event: "payout_success",
-          txnId: trxId,
-          status: "Success",
-        });
-      }
-
-      await session.commitTransaction();
-      session.endSession();
-
-      console.log(`Payout processed for ${trxId}`);
-    } catch (error) {
-      console.error("Scheduler Error:", error);
-      await session.abortTransaction();
-      session.endSession();
-    }
-  }, 60 * 1000); // ⏱️ 1 minute
+    }, 60 * 1000); // ⏱️ 1 minute
 };
