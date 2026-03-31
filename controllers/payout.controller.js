@@ -210,6 +210,8 @@ const schedulePayoutStatusCheck = (trxId) => {
         }
     }, 60 * 1000); // ⏱️ 1 minute
 }
+
+
 // In-memory mutex store for single instance
 const userLocks = new Map();
 
@@ -806,6 +808,8 @@ export const updatePayoutStatus = async (req, res) => {
             }
 
         } else if (payoutApi.name == "amitpayout") {
+            schedulePayoutStatusCheck(trxId);
+            return res.status(200).json({ message: "Success", data: "Status check scheduled successfully" });
             const payload = {
                 "orderid": trxId
             }
