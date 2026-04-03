@@ -9,19 +9,19 @@ import userMetaModel from "../models/userMeta.model.js";
 import MainWalletTransaction from "../models/mainWallet.model.js";
 
 
-const schedulePayoutStatusCheck = (trxId) => {
+const schedulePayoutStatusCheck = (trxId, attempt = 4) => {
     setTimeout(async () => {
         const session = await mongoose.startSession();
         session.startTransaction();
 
         try {
-            console.log(`Checking payout status for trxId: ${trxId}`);
+            console.log(`Attempt ${attempt}: Checking payout status for trxId: ${trxId}`);
 
             const isPending = await payOutModelGenerate
-                .findOne({ trxId, status: "Pending" })
+                .findOne({ trxId })
                 .session(session);
 
-            if (!isPending) {
+            if (!isPending || isPending.status !== "Pending") {
                 await session.abortTransaction();
                 session.endSession();
                 return;
@@ -39,6 +39,7 @@ const schedulePayoutStatusCheck = (trxId) => {
 
             let statusCheck;
 
+            // ================= PAYINFINTECH =================
             if (payoutApi.name === "payinfintech") {
                 const payload = { orderid: trxId };
 
@@ -48,6 +49,10 @@ const schedulePayoutStatusCheck = (trxId) => {
                 );
 
                 if (!statusResponse?.data?.status) {
+                    // 🔁 Retry if invalid response
+                    if (attempt < 4) {
+                        return schedulePayoutStatusCheck(trxId, attempt + 1);
+                    }
                     await session.abortTransaction();
                     session.endSession();
                     return;
@@ -58,46 +63,53 @@ const schedulePayoutStatusCheck = (trxId) => {
                     message: statusResponse.data.message,
                     status_code: statusResponse.data.status_code,
                     amount: statusResponse.data.data.amount,
-                    utr: statusResponse.data.data.utr,
+                    utr: statusResponse.data.data.utr || trxId,
                     optxId: statusResponse.data.data.txnId,
                 };
             }
+
+            // ================= AMITPAYOUT =================
             if (payoutApi.name === "amitpayout") {
                 const statusResponse = await axios.get(
                     `https://pay.growsmay.in/api/payment/status/${trxId}`,
-                    {
-                        validateStatus: () => true // ✅ accept all status codes
-                    }
+                    { validateStatus: () => true }
                 );
 
-                console.log(statusResponse?.data)
-
-                // if (!statusResponse?.data?.success) {
-                //     await session.abortTransaction();
-                //     session.endSession();
-                //     return;
-                // }
-                if (!statusResponse?.data?.success) {
-                    statusCheck = {
-                        status: statusResponse.data?.data?.status || "failed",
-                        message: statusResponse.data?.message,
-                        status_code: statusResponse.data?.data?.status ? 101 : 106,
-                        amount: statusResponse.data?.data?.amount || null,
-                        utr: statusResponse.data?.data?.utr || null,
-                        optxId: statusResponse.data?.data?.transaction_id || statusResponse.data?.data?.payment_id || null,
+                if (!statusResponse?.data) {
+                    // 🔁 Retry if blank response
+                    if (attempt < 4) {
+                        return schedulePayoutStatusCheck(trxId, attempt + 1);
                     }
-                } else {
-                    statusCheck = {
-                        status: statusResponse.data?.data?.status,
-                        message: statusResponse.data?.message,
-                        status_code: statusResponse.data?.data?.status ? 101 : 106,
-                        amount: statusResponse.data?.data?.amount,
-                        utr: statusResponse.data?.data?.utr,
-                        optxId: statusResponse.data?.data?.transaction_id || statusResponse.data?.data?.payment_id,
-                    };
+                    await session.abortTransaction();
+                    session.endSession();
+                    return;
+                }
+
+                const data = statusResponse.data;
+
+                statusCheck = {
+                    status: data?.data?.status || "failed",
+                    message: data?.message,
+                    status_code: data?.data?.status ? 101 : 106,
+                    amount: data?.data?.amount || null,
+                    utr: data?.data?.utr || null,
+                    optxId:
+                        data?.data?.transaction_id ||
+                        data?.data?.payment_id ||
+                        null,
+                };
+            }
+
+            // 🔁 Retry if still pending
+            if (!statusCheck || statusCheck.status?.toLowerCase() === "pending") {
+                if (attempt < 4) {
+                    await session.abortTransaction();
+                    session.endSession();
+                    return schedulePayoutStatusCheck(trxId, attempt + 1);
                 }
             }
 
+            // ================= UPDATE =================
             const payOutGen = await payOutModelGenerate.findOneAndUpdate(
                 { trxId },
                 {
@@ -124,6 +136,7 @@ const schedulePayoutStatusCheck = (trxId) => {
             const netAmount =
                 payOutGen.amount + (payOutGen.gatewayCharge || 0);
 
+            // ================= FAILED =================
             if (
                 statusCheck.status.toLowerCase() !== "success" ||
                 statusCheck.status_code !== 101
@@ -135,21 +148,14 @@ const schedulePayoutStatusCheck = (trxId) => {
                 );
 
                 if (userMeta?.payOutCallbackUrl) {
-                    try {
-                        axios.post(userMeta.payOutCallbackUrl, {
-                            event: "payout_failed",
-                            txnId: trxId,
-                            status: "Failed",
-                            status_code: 400,
-                            amount: payOutGen.amount,
-                            utr: null,
-                            vpaId: null,
-                            txnStartDate: payOutGen.createdAt,
-                            message: 'Payment failed'
-                        });
-                    } catch (error) {
-                        null
-                    }
+                    axios.post(userMeta.payOutCallbackUrl, {
+                        event: "payout_failed",
+                        txnId: trxId,
+                        status: "Failed",
+                        status_code: 400,
+                        amount: payOutGen.amount,
+                        message: 'Payment failed'
+                    }).catch(() => { });
                 }
 
                 await session.commitTransaction();
@@ -157,59 +163,59 @@ const schedulePayoutStatusCheck = (trxId) => {
                 return;
             }
 
-            // ✅ SUCCESS CASE
+            // ================= SUCCESS =================
             if (!statusCheck.utr) {
-                await session.abortTransaction();
-                session.endSession();
-                return;
+                if (attempt < 4) {
+                    await session.abortTransaction();
+                    session.endSession();
+                    return schedulePayoutStatusCheck(trxId, attempt + 1);
+                }
             }
 
             await payOutModel.create(
-                [
-                    {
-                        user_id: payOutGen.user_id,
-                        amount: payOutGen.amount,
-                        chargeAmount: payOutGen.gatewayCharge || 0,
-                        finalAmount: netAmount,
-                        utr: statusCheck.utr,
-                        referenceID: statusCheck.optxId,
-                        trxId,
-                        isSuccess: "Success",
-                    },
-                ],
+                [{
+                    user_id: payOutGen.user_id,
+                    amount: payOutGen.amount,
+                    chargeAmount: payOutGen.gatewayCharge || 0,
+                    finalAmount: netAmount,
+                    utr: statusCheck.utr,
+                    referenceID: statusCheck.optxId,
+                    trxId,
+                    isSuccess: "Success",
+                }],
                 { session }
             );
 
             if (userMeta?.payOutCallbackUrl) {
-                try {
-                    axios.post(userMeta.payOutCallbackUrl, {
-                        event: "payout_success",
-                        txnId: trxId,
-                        status: "Success",
-                        status_code: 200,
-                        amount: payOutGen.amount,
-                        chargeAmount: payOutGen.gatewayCharge || 0,
-                        netAmount: netAmount,
-                        utr: statusCheck.utr,
-                        txnStartDate: payOutGen.createdAt,
-                        message: 'Payment success'
-                    });
-                } catch (error) {
-                    null
-                }
+                axios.post(userMeta.payOutCallbackUrl, {
+                    event: "payout_success",
+                    txnId: trxId,
+                    status: "Success",
+                    status_code: 200,
+                    amount: payOutGen.amount,
+                    netAmount,
+                    utr: statusCheck.utr,
+                    message: 'Payment success'
+                }).catch(() => { });
             }
 
             await session.commitTransaction();
             session.endSession();
 
             console.log(`Payout processed for ${trxId}`);
+
         } catch (error) {
             console.error("Scheduler Error:", error);
             await session.abortTransaction();
             session.endSession();
+
+            // 🔁 Retry on error
+            if (attempt < 4) {
+                schedulePayoutStatusCheck(trxId, attempt + 1);
+            }
         }
-    }, 60 * 1000); // ⏱️ 1 minute
-}
+    }, 1.5 * 60 * 1000); // ⏱️ 2 minute delay
+};
 
 
 // In-memory mutex store for single instance
@@ -802,13 +808,15 @@ export const updatePayoutStatus = async (req, res) => {
                     message: statusResponse.data.message,
                     status_code: statusResponse.data.status_code,
                     amount: statusResponse.data.data.amount,
-                    utr: statusResponse.data.data.utr,
+                    utr: statusResponse.data.data.utr || trxId,
                     optxId: statusResponse.data.data.txnId
                 }
             }
 
         } else if (payoutApi.name == "amitpayout") {
             schedulePayoutStatusCheck(trxId);
+            await session.abortTransaction();
+            session.endSession();
             return res.status(200).json({ message: "Success", data: "Status check scheduled successfully" });
             const payload = {
                 "orderid": trxId
@@ -839,7 +847,7 @@ export const updatePayoutStatus = async (req, res) => {
 
         const payOutGen = await payOutModelGenerate.findOneAndUpdate(
             { trxId: trxId },
-            { $set: { status: (statusCheck.status === "success" || statusCheck.status_code === 101) ? "Success" : "Failed", utr: statusCheck.utr, failureReason: statusCheck.status != "success" ? statusCheck.message : null } },
+            { $set: { status: (statusCheck.status === "success" || statusCheck.status_code === 101) ? "Success" : "Failed", utr: statusCheck.utr || trxId, failureReason: statusCheck.status != "success" ? statusCheck.message : null } },
             { new: true, session }
         );
 
